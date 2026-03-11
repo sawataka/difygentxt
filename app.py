@@ -1,46 +1,59 @@
-from flask import Flask, request, jsonify, render_template
-import requests
-import os
+from flask import Flask, render_template, request, jsonify
+import markdown
+from services.dify_client import generate
+import json
+import re
 
 app = Flask(__name__)
 
-DIFY_API_URL = "http://localhost:8080/v1/chat-messages"
-DIFY_API_KEY = "app-xKuHg8IZfIjw7TUXVjKYCy5d"  # In production, use environment variable
+
+def parse_ai_response(text):
+
+    try:
+        return json.loads(text)
+
+    except:
+        match = re.search(r"\{.*\}", text, re.S)
+
+        if match:
+            try:
+                return json.loads(match.group())
+            except:
+                pass
+
+    return {"description": text, "points": [], "sns_post": ""}
 
 
 @app.route("/")
 def index():
-    return render_template("chat.html")
+    return render_template("index.html")
 
 
-@app.route("/chat", methods=["POST"])
-def chat():
-    user_message = request.json.get("message")
-    if not user_message:
-        return jsonify({"error": "No message provided"}), 400
-    headers = {
-        "Authorization": f"Bearer {DIFY_API_KEY}",
-        "Content-Type": "application/json",
-    }
+@app.route("/generate", methods=["POST"])
+def generate_ai():
 
-    data = {
-        "inputs": {},
-        "query": user_message,
-        "response_mode": "blocking",
-        "user": "user123",
-    }
+    title = request.form.get("title")
+    organization = request.form.get("organization")
+    question = request.form.get("question")
 
-    try:
-        response = requests.post(DIFY_API_URL, headers=headers, json=data, timeout=60)
-        response.raise_for_status()
-        result = response.json()
-        print("API response:", result)  # Debug log
-        return jsonify({"response": result.get("answer", "No response")})
-        # return jsonify(result)
+    if not question:
+        return jsonify({"error": "質問は必須です"}), 400
 
-    except requests.exceptions.RequestException as e:
-        print("API error:", str(e))  # Debug log
-        return jsonify({"error": str(e)}), 500
+    dify_response = generate(title, organization, question)
+
+    answer_text = dify_response.get("answer", "")
+
+    parsed = parse_ai_response(answer_text)
+
+    description_html = markdown.markdown(parsed["description"])
+
+    return jsonify(
+        {
+            "description": description_html,
+            "points": parsed["points"],
+            "sns_post": parsed["sns_post"],
+        }
+    )
 
 
 if __name__ == "__main__":

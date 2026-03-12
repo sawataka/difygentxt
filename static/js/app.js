@@ -24,28 +24,33 @@ function startLoadingAnimation(){
 
 form.addEventListener("submit", async function(e){
 
- e.preventDefault()
+  e.preventDefault()
 
- document.getElementById("loading").style.display="block"
+  // ローディング表示
+  document.getElementById("loading").style.display = "block"
+  document.getElementById("result").style.display = "none"
 
- document.getElementById("result").style.display="none"
+  startLoadingAnimation()
 
- startLoadingAnimation()
+  // 👇ローディング表示後にスクロール
+  setTimeout(() => {
+    document.getElementById("loading").scrollIntoView({
+      behavior: "smooth"
+    })
+  }, 100)
 
- const formData = new FormData(form)
+  const formData = new FormData(form)
 
- const res = await fetch("/generate",{
+  const res = await fetch("/generate",{
+    method:"POST",
+    body:formData
+  })
 
-  method:"POST",
-  body:formData
+  const data = await res.json()
 
- })
+  document.getElementById("loading").style.display="none"
 
- const data = await res.json()
-
- document.getElementById("loading").style.display="none"
-
- showResult(data)
+  showResult(data)
 
 })
 
